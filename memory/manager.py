@@ -24,6 +24,45 @@ class MemoryManager:
         if triplets:
             self.graph_store.add_triplets(triplets)
             
+    def sync_local_documents(self, docs_dir: str = "documents"):
+        """Chunk and ingest local markdown documents into the VectorStore."""
+        import os
+        if not os.path.exists(docs_dir):
+            return
+        
+        # We don't want to re-ingest every startup optimally, but since it's testing data,
+        # we'll do an overwrite/add for now. The VectorStore is in-memory for Qdrant.
+        for filename in os.listdir(docs_dir):
+            if filename.endswith(".md"):
+                file_path = os.path.join(docs_dir, filename)
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    
+                    # Custom lightweight chunking
+                    chunks = []
+                    paragraphs = content.split("\n\n")
+                    curr_chunk = ""
+                    for p in paragraphs:
+                        if p.startswith("#"):
+                            if curr_chunk:
+                                chunks.append(curr_chunk.strip())
+                            curr_chunk = p + "\n"
+                        else:
+                            curr_chunk += p + "\n\n"
+                            if len(curr_chunk) > 1000:
+                                chunks.append(curr_chunk.strip())
+                                curr_chunk = ""
+                    if curr_chunk:
+                        chunks.append(curr_chunk.strip())
+                        
+                    chunks = [c for c in chunks if c.strip()]
+                    metas = [{"source": f"local_documents/{filename}"} for _ in chunks]
+                    self.vector_store.add_texts(chunks, metas)
+                    print(f"Ingested {len(chunks)} chunks from {filename} into Vector memory.")
+                except Exception as e:
+                    print(f"Error reading {filename}: {e}")
+            
     def query_memory(self, query: str) -> str:
         """Search both memories and synthesize the results."""
         # Query Vector RAG

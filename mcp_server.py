@@ -72,5 +72,8 @@ def validate_source(source: str) -> str:
     else:
         return f"Source '{source}' is NOT whitelisted. Do not trust this information blindly."
 
+# Trigger the document sync so trusted vectors are loaded before any query arrives
+memory.sync_local_documents()
+
 if __name__ == "__main__":
     mcp.run()
