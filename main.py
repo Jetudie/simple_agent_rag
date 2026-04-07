@@ -3,7 +3,6 @@ import os
 from dotenv import load_dotenv
 from rich.console import Console
 
-from memory.manager import MemoryManager
 from tools.mcp_client import MCPClientManager
 from agent.react import ReActAgent
 
@@ -13,21 +12,25 @@ async def main():
     load_dotenv()
     console.print("[bold green]Starting AI Agent...[/bold green]")
     
-    console.print("Initializing Memory Manager (VectorRAG + GraphRAG)...")
-    memory_manager = MemoryManager(model_name="ollama/gemma4:e4b", api_base="http://localhost:11434")
-    
     console.print("Initializing MCP Client Manager...")
     mcp_client = MCPClientManager()
     
+    console.print("Launching Internal MCP Server for Memory & Skills...")
+    try:
+        await mcp_client.connect_to_server("internal", "python", ["mcp_server.py"])
+        console.print("[green]Connected to Internal MCP memory.[/green]")
+    except Exception as e:
+        console.print(f"[red]Failed to start internal MCP server: {e}[/red]")
+        return
+        
     # Optional: uncomment to connect to an MCP server
-    # Note: Requires npx and nodejs installed.
     # try:
     #     await mcp_client.connect_to_server("filesystem", "npx", ["-y", "@modelcontextprotocol/server-filesystem", "./"])
     #     console.print("[green]Connected to filesystem MCP.[/green]")
     # except Exception as e:
     #     console.print(f"[yellow]Could not connect to filesystem MCP: {e}[/yellow]")
     
-    agent = ReActAgent(memory_manager, mcp_client, model_name="ollama/gemma4:e4b", api_base="http://localhost:11434")
+    agent = ReActAgent(mcp_client, model_name="ollama/gemma4:e4b", api_base="http://localhost:11434")
     
     console.print("\n[bold blue]Agent Ready![/bold blue] Type 'exit' to quit.")
     
