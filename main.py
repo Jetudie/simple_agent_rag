@@ -14,7 +14,7 @@ async def main():
     console.print("[bold green]Starting AI Agent...[/bold green]")
     
     console.print("Initializing Memory Manager (VectorRAG + GraphRAG)...")
-    memory_manager = MemoryManager(model_name="ollama/qwen3:4b", api_base="http://localhost:11434")
+    memory_manager = MemoryManager(model_name="ollama/gemma4:e4b", api_base="http://localhost:11434")
     
     console.print("Initializing MCP Client Manager...")
     mcp_client = MCPClientManager()
@@ -27,7 +27,7 @@ async def main():
     # except Exception as e:
     #     console.print(f"[yellow]Could not connect to filesystem MCP: {e}[/yellow]")
     
-    agent = ReActAgent(memory_manager, mcp_client, model_name="ollama/qwen3:4b", api_base="http://localhost:11434")
+    agent = ReActAgent(memory_manager, mcp_client, model_name="ollama/gemma4:e4b", api_base="http://localhost:11434")
     
     console.print("\n[bold blue]Agent Ready![/bold blue] Type 'exit' to quit.")
     

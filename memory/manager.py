@@ -6,7 +6,7 @@ from memory.entity_store import EntityStore
 from litellm import completion
 
 class MemoryManager:
-    def __init__(self, model_name: str = "ollama/qwen3:4b", api_base: str = "http://localhost:11434"):
+    def __init__(self, model_name: str = "ollama/gemma4:e4b", api_base: str = "http://localhost:11434"):
         """Initialize both memory stores."""
         self.vector_store = VectorStore()
         self.graph_store = GraphStore()

@@ -1,12 +1,24 @@
 import os
 import json
+import numpy as np
 from typing import Dict, Any, Optional
+from fastembed import TextEmbedding
 
 class EntityStore:
     def __init__(self, path: str = "entity_db.json"):
         self.path = path
         self.db: Dict[str, Dict[str, Any]] = {}
+        self.embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+        self.embeddings: Dict[str, np.ndarray] = {}
         self.load()
+        self._rebuild_embeddings()
+        
+    def _rebuild_embeddings(self):
+        keys = list(self.db.keys())
+        if keys:
+            embs = list(self.embedding_model.embed(keys))
+            for k, e in zip(keys, embs):
+                self.embeddings[k] = e
         
     def load(self):
         if os.path.exists(self.path):
@@ -41,24 +53,57 @@ class EntityStore:
             action = "Created"
             
         self.save()
+        
+        # update vec
+        emb = list(self.embedding_model.embed([name_key]))[0]
+        self.embeddings[name_key] = emb
+        
         return f"Successfully {action} entity '{name}'."
         
-    def get_entity(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_entity(self, name: str, threshold: float = 0.75) -> Optional[Dict[str, Any]]:
         name_key = name.strip().lower()
         if name_key in self.db:
-            return {"name": name, **self.db[name_key]}
+            return {"name": name_key, **self.db[name_key]}
         
-        # Fallback pseudo-search
+        # Fallback substring search
         for key, val in self.db.items():
             if name_key in key or key in name_key:
                 return {"name": key, **val}
+                
+        # Semantic Vector fuzzy search
+        if not self.embeddings:
+            return None
+            
+        query_emb = list(self.embedding_model.embed([name_key]))[0]
+        best_key = ""
+        best_score = -1.0
+        
+        for key, emb in self.embeddings.items():
+            score = np.dot(query_emb, emb) / (np.linalg.norm(query_emb) * np.linalg.norm(emb))
+            if score > best_score:
+                best_score = score
+                best_key = key
+                
+        if best_score >= threshold:
+            return {"name": best_key, **self.db[best_key]}
                 
         return None
         
     def delete_entity(self, name: str) -> str:
         name_key = name.strip().lower()
-        if name_key in self.db:
-            del self.db[name_key]
+        
+        # Determine actual key using the same search logic
+        target_key = name_key
+        if target_key not in self.db:
+            ent = self.get_entity(name_key)
+            if ent:
+                target_key = ent["name"]
+                
+        if target_key in self.db:
+            del self.db[target_key]
+            if target_key in self.embeddings:
+                del self.embeddings[target_key]
             self.save()
-            return f"Successfully deleted entity '{name}'."
+            return f"Successfully deleted entity '{target_key}'."
+            
         return f"Entity '{name}' not found."

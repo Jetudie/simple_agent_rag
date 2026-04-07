@@ -8,7 +8,7 @@ from tools.mcp_client import MCPClientManager
 from memory.diary import Diary
 
 class ReActAgent:
-    def __init__(self, memory_manager: MemoryManager, mcp_client: MCPClientManager, model_name: str = "ollama/qwen3:4b", api_base: str = "http://localhost:11434"):
+    def __init__(self, memory_manager: MemoryManager, mcp_client: MCPClientManager, model_name: str = "ollama/gemma4:e4b", api_base: str = "http://localhost:11434"):
         self.memory = memory_manager
         self.mcp = mcp_client
         self.diary = Diary()
@@ -42,6 +42,7 @@ class ReActAgent:
         tools_desc += "- Tool: upsert_entity, Desc: Create or update structured JSON profile for person/product/topic, Schema: {\"name\": \"string\", \"type\": \"string\", \"attributes\": {\"key\": \"value\"}}\n"
         tools_desc += "- Tool: get_entity, Desc: Force grab a profile from entity DB, Schema: {\"name\": \"string\"}\n"
         tools_desc += "- Tool: delete_entity, Desc: Delete profile from entity DB, Schema: {\"name\": \"string\"}\n"
+        tools_desc += "- Tool: validate_source, Desc: Strict verification if a source path/domain is whitelisted, Schema: {\"source\": \"string\"}\n"
 
         prompt = f"User Query: {query}\n\nCurrent Semantic and Relational Memory Context:\n{memory_context}\n{tools_desc}"
         self.chat_history.append({"role": "user", "content": prompt})
@@ -57,6 +58,14 @@ class ReActAgent:
                 self.chat_history.append({"role": "assistant", "content": content})
                 print(f"\n[Agent Thought/Action]:\n{content}")
                 self.diary.log("AGENT_STEP", content)
+                
+                # Programmatic Harness - Enforce Checklist
+                if "Checklist:" not in content:
+                    error_msg = "Observation: Formatting Harness Violation: Mandatory 'Checklist:' block was missing from your output. Please retry your thought process including the checklist state."
+                    self.chat_history.append({"role": "user", "content": error_msg})
+                    self.diary.log("HARNESS_VIOLATION", error_msg)
+                    print(f"[Harness Violation Detected]")
+                    continue
                 
                 if "Answer:" in content:
                     answer_text = content.split("Answer:", 1)[1].strip()
@@ -90,6 +99,13 @@ class ReActAgent:
                                 obs = json.dumps(ent) if ent else f"Entity '{args.get('name')}' not found."
                             elif tool == "delete_entity":
                                 obs = self.memory.entity_store.delete_entity(args.get("name", ""))
+                            elif tool == "validate_source":
+                                source = args.get("source", "").lower()
+                                whitelist = ["internal_memory", "entity_store", "diary", "local_documents", "verified_user", "localhost"]
+                                if any(w in source for w in whitelist):
+                                    obs = f"Source '{source}' is WHITELISTED and trusted."
+                                else:
+                                    obs = f"Source '{source}' is NOT whitelisted. Do not trust this information blindly."
                             else:
                                 obs = f"Unknown internal tool {tool}"
                         else:
