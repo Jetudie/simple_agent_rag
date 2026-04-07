@@ -5,11 +5,12 @@ from memory.graph_store import GraphStore
 from litellm import completion
 
 class MemoryManager:
-    def __init__(self, model_name: str = "gemini/gemini-2.5-pro"):
+    def __init__(self, model_name: str = "ollama/qwen3:4b", api_base: str = "http://localhost:11434"):
         """Initialize both memory stores."""
         self.vector_store = VectorStore()
         self.graph_store = GraphStore()
         self.model_name = model_name
+        self.api_base = api_base
         
     def add_memory(self, text: str, source: str = "user"):
         """Process incoming text, adding it to both Vector and Graph stores."""
@@ -53,6 +54,7 @@ class MemoryManager:
         try:
             response = completion(
                 model=self.model_name,
+                api_base=self.api_base,
                 messages=[{"role": "user", "content": prompt}]
             )
             content = response.choices[0].message.content.strip()
@@ -78,6 +80,7 @@ class MemoryManager:
         try:
             response = completion(
                 model=self.model_name,
+                api_base=self.api_base,
                 messages=[{"role": "user", "content": prompt}]
             )
             content = response.choices[0].message.content.strip()

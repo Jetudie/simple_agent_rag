@@ -13,11 +13,8 @@ async def main():
     load_dotenv()
     console.print("[bold green]Starting AI Agent...[/bold green]")
     
-    if not os.environ.get("GEMINI_API_KEY"):
-        console.print("[yellow]WARNING: GEMINI_API_KEY not found in environment. Please add it to your .env file.[/yellow]")
-    
     console.print("Initializing Memory Manager (VectorRAG + GraphRAG)...")
-    memory_manager = MemoryManager(model_name="gemini/gemini-2.5-pro")
+    memory_manager = MemoryManager(model_name="ollama/qwen3:4b", api_base="http://localhost:11434")
     
     console.print("Initializing MCP Client Manager...")
     mcp_client = MCPClientManager()
@@ -30,7 +27,7 @@ async def main():
     # except Exception as e:
     #     console.print(f"[yellow]Could not connect to filesystem MCP: {e}[/yellow]")
     
-    agent = ReActAgent(memory_manager, mcp_client, model_name="gemini/gemini-2.5-pro")
+    agent = ReActAgent(memory_manager, mcp_client, model_name="ollama/qwen3:4b", api_base="http://localhost:11434")
     
     console.print("\n[bold blue]Agent Ready![/bold blue] Type 'exit' to quit.")
     
