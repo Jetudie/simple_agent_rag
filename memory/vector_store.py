@@ -44,11 +44,11 @@ class VectorStore:
         """Search for most similar texts."""
         query_vector = list(self.embedding_model.embed([query]))[0]
         
-        results = self.client.search(
+        results = self.client.query_points(
             collection_name=self.collection_name,
-            query_vector=query_vector.tolist(),
+            query=query_vector.tolist(),
             limit=limit
-        )
+        ).points
         
         return [
             {
