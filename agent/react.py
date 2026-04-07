@@ -35,11 +35,13 @@ class ReActAgent:
         for t in tools:
             tools_desc += f"- Server: {t['server']}, Tool: {t['name']}, Desc: {t['description']}, Schema: {json.dumps(t['inputSchema'])}\n"
         
-        # Add Internal Tools
         tools_desc += "\nAvailable Internal Tools (server: \"internal\"):\n"
         tools_desc += "- Tool: read_diary, Desc: Reads full thought process of a past day, Schema: {\"date\": \"YYYY-MM-DD\"}\n"
         tools_desc += "- Tool: list_diaries, Desc: Lists all available diary dates, Schema: {}\n"
         tools_desc += "- Tool: delete_graph_node, Desc: Deletes an entity node from the knowledge graph, Schema: {\"entity\": \"entity_name\"}\n"
+        tools_desc += "- Tool: upsert_entity, Desc: Create or update structured JSON profile for person/product/topic, Schema: {\"name\": \"string\", \"type\": \"string\", \"attributes\": {\"key\": \"value\"}}\n"
+        tools_desc += "- Tool: get_entity, Desc: Force grab a profile from entity DB, Schema: {\"name\": \"string\"}\n"
+        tools_desc += "- Tool: delete_entity, Desc: Delete profile from entity DB, Schema: {\"name\": \"string\"}\n"
 
         prompt = f"User Query: {query}\n\nCurrent Semantic and Relational Memory Context:\n{memory_context}\n{tools_desc}"
         self.chat_history.append({"role": "user", "content": prompt})
@@ -81,6 +83,13 @@ class ReActAgent:
                             elif tool == "delete_graph_node":
                                 deleted = self.memory.graph_store.delete_node(args.get("entity", ""))
                                 obs = f"Deleted node '{args.get('entity')}'? {deleted}"
+                            elif tool == "upsert_entity":
+                                obs = self.memory.entity_store.upsert_entity(args.get("name", ""), args.get("type", "Topic"), args.get("attributes", {}))
+                            elif tool == "get_entity":
+                                ent = self.memory.entity_store.get_entity(args.get("name", ""))
+                                obs = json.dumps(ent) if ent else f"Entity '{args.get('name')}' not found."
+                            elif tool == "delete_entity":
+                                obs = self.memory.entity_store.delete_entity(args.get("name", ""))
                             else:
                                 obs = f"Unknown internal tool {tool}"
                         else:

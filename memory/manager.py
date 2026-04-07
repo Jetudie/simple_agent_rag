@@ -2,6 +2,7 @@ import json
 from typing import List, Dict, Any, Tuple
 from memory.vector_store import VectorStore
 from memory.graph_store import GraphStore
+from memory.entity_store import EntityStore
 from litellm import completion
 
 class MemoryManager:
@@ -9,6 +10,7 @@ class MemoryManager:
         """Initialize both memory stores."""
         self.vector_store = VectorStore()
         self.graph_store = GraphStore()
+        self.entity_store = EntityStore()
         self.model_name = model_name
         self.api_base = api_base
         
@@ -28,18 +30,26 @@ class MemoryManager:
         vector_results = self.vector_store.search(query, limit=3)
         vector_context = "\n".join([f"- {r['text']} (source: {r['metadata'].get('source', 'unknown')})" for r in vector_results])
         
-        # Query GraphRAG using LLM to extract entities from query
+        # Query GraphRAG & EntityStore using LLM to extract entities from query
         entities = self._extract_entities_from_query(query)
         graph_context_list = []
+        entity_profiles = []
         for entity in entities:
             graph_context_list.extend(self.graph_store.get_related_triplets(entity))
+            profile = self.entity_store.get_entity(entity)
+            if profile:
+                entity_profiles.append(json.dumps(profile))
+                
         graph_context_list = list(set(graph_context_list))
         graph_context = "\n".join([f"- {g}" for g in graph_context_list])
+        entity_context = "\n".join(entity_profiles)
         
         context = "### Semantic Memory Context ###\n"
         context += vector_context if vector_context else "No semantic memory found."
         context += "\n\n### Graph/Relational Memory Context ###\n"
         context += graph_context if graph_context else "No relational memory found."
+        context += "\n\n### Structured Entity Profiles ###\n"
+        context += entity_context if entity_context else "No structured entities found."
         
         return context
 
