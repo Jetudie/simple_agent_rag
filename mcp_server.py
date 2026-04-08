@@ -63,6 +63,58 @@ def delete_entity(name: str) -> str:
     return memory.entity_store.delete_entity(name)
 
 @mcp.tool()
+def memorize_fact(fact: str) -> str:
+    """Actively inject a new fact directly into the Vector and Graph databases."""
+    memory.add_memory(fact, source="agent_active_learning")
+    return f"Successfully ingrained fact into subconscious memory."
+
+@mcp.tool()
+def add_graph_edge(subject: str, predicate: str, object_node: str) -> str:
+    """Surgically explicitly map a conceptual relationship in the Graph Database without background extraction."""
+    memory.graph_store.add_triplets([(subject, predicate, object_node)])
+    return f"Created Graph edge: ({subject}) -[{predicate}]-> ({object_node})"
+
+@mcp.tool()
+def list_notes() -> str:
+    """Returns a list of all self-authored learning notes the agent has created."""
+    import os
+    if not os.path.exists("notes"):
+        return "Notes folder is empty."
+    return ", ".join([f for f in os.listdir("notes") if f.endswith(".md")])
+
+@mcp.tool()
+def read_note(filename: str) -> str:
+    """Read full content of a specific note."""
+    import os
+    path = os.path.join("notes", filename)
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    return f"Note {filename} not found."
+
+@mcp.tool()
+def write_note(filename: str, content: str) -> str:
+    """Create or overwrite a self-learning notebook markdown file."""
+    import os
+    if not os.path.exists("notes"):
+        os.makedirs("notes")
+    path = os.path.join("notes", filename)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+    return f"Successfully wrote to {filename}."
+
+@mcp.tool()
+def append_note(filename: str, content: str) -> str:
+    """Append text to an existing note."""
+    import os
+    if not os.path.exists("notes"):
+        os.makedirs("notes")
+    path = os.path.join("notes", filename)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write("\n" + content)
+    return f"Successfully appended to {filename}."
+
+@mcp.tool()
 def validate_source(source: str) -> str:
     """Strict verification if a source path/domain is whitelisted."""
     source_lower = source.lower()
@@ -74,6 +126,7 @@ def validate_source(source: str) -> str:
 
 # Trigger the document sync so trusted vectors are loaded before any query arrives
 memory.sync_local_documents()
+memory.sync_agent_notes()
 
 if __name__ == "__main__":
     mcp.run()
