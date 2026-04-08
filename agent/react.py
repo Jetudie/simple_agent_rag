@@ -2,7 +2,7 @@ import json
 import re
 import os
 from typing import List, Dict, Any, Optional
-from litellm import acompletion
+from openai import AsyncOpenAI
 from tools.mcp_client import MCPClientManager
 
 class ReActAgent:
@@ -11,6 +11,7 @@ class ReActAgent:
         self.model_name = model_name
         self.api_base = api_base
         self.api_key = api_key
+        self.client = AsyncOpenAI(base_url=self.api_base, api_key=self.api_key)
         
         # Load system prompt from skills.md
         self.system_prompt = "You are an advanced AI Agent."
@@ -37,10 +38,8 @@ class ReActAgent:
         
         for i in range(max_iterations):
             try:
-                response = await acompletion(
+                response = await self.client.chat.completions.create(
                     model=self.model_name,
-                    api_base=self.api_base,
-                    api_key=self.api_key,
                     messages=self.chat_history
                 )
                 content = response.choices[0].message.content

@@ -4,9 +4,9 @@ from memory.diary import Diary
 
 mcp = FastMCP("InternalAgentMemory")
 import os
-model_name = os.getenv("LITELLM_MODEL", "ollama/gemma4:e4b")
-api_base = os.getenv("LITELLM_API_BASE", "http://localhost:11434")
-api_key = os.getenv("LITELLM_API_KEY", "")
+model_name = os.getenv("OPENAI_MODEL_NAME", "ollama/gemma4:e4b")
+api_base = os.getenv("OPENAI_BASE_URL", "http://localhost:11434/v1")
+api_key = os.getenv("OPENAI_API_KEY", "ollama")
 memory = MemoryManager(model_name=model_name, api_base=api_base, api_key=api_key)
 diary = Diary()
 

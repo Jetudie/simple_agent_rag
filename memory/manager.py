@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Tuple
 from memory.vector_store import VectorStore
 from memory.graph_store import GraphStore
 from memory.entity_store import EntityStore
-from litellm import completion
+from openai import OpenAI
 
 class MemoryManager:
     def __init__(self, model_name: str = "ollama/gemma4:e4b", api_base: str = "http://localhost:11434", api_key: str = ""):
@@ -14,6 +14,7 @@ class MemoryManager:
         self.model_name = model_name
         self.api_base = api_base
         self.api_key = api_key
+        self.client = OpenAI(base_url=self.api_base, api_key=self.api_key)
         
     def add_memory(self, text: str, source: str = "user"):
         """Process incoming text, adding it to both Vector and Graph stores."""
@@ -138,10 +139,8 @@ class MemoryManager:
         Text: {text}
         """
         try:
-            response = completion(
+            response = self.client.chat.completions.create(
                 model=self.model_name,
-                api_base=self.api_base,
-                api_key=self.api_key,
                 messages=[{"role": "user", "content": prompt}]
             )
             content = response.choices[0].message.content.strip()
@@ -165,10 +164,8 @@ class MemoryManager:
         Query: {query}
         """
         try:
-            response = completion(
+            response = self.client.chat.completions.create(
                 model=self.model_name,
-                api_base=self.api_base,
-                api_key=self.api_key,
                 messages=[{"role": "user", "content": prompt}]
             )
             content = response.choices[0].message.content.strip()
