@@ -6,10 +6,11 @@ from litellm import acompletion
 from tools.mcp_client import MCPClientManager
 
 class ReActAgent:
-    def __init__(self, mcp_client: MCPClientManager, model_name: str = "ollama/gemma4:e4b", api_base: str = "http://localhost:11434"):
+    def __init__(self, mcp_client: MCPClientManager, model_name: str = "ollama/gemma4:e4b", api_base: str = "http://localhost:11434", api_key: str = ""):
         self.mcp = mcp_client
         self.model_name = model_name
         self.api_base = api_base
+        self.api_key = api_key
         
         # Load system prompt from skills.md
         self.system_prompt = "You are an advanced AI Agent."
@@ -39,6 +40,7 @@ class ReActAgent:
                 response = await acompletion(
                     model=self.model_name,
                     api_base=self.api_base,
+                    api_key=self.api_key,
                     messages=self.chat_history
                 )
                 content = response.choices[0].message.content

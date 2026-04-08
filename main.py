@@ -30,7 +30,11 @@ async def main():
     # except Exception as e:
     #     console.print(f"[yellow]Could not connect to filesystem MCP: {e}[/yellow]")
     
-    agent = ReActAgent(mcp_client, model_name="ollama/gemma4:e4b", api_base="http://localhost:11434")
+    import os
+    model_name = os.getenv("LITELLM_MODEL", "ollama/gemma4:e4b")
+    api_base = os.getenv("LITELLM_API_BASE", "http://localhost:11434")
+    api_key = os.getenv("LITELLM_API_KEY", "")
+    agent = ReActAgent(mcp_client, model_name=model_name, api_base=api_base, api_key=api_key)
     
     console.print("\n[bold blue]Agent Ready![/bold blue] Type 'exit' to quit.")
     
