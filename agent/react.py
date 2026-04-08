@@ -26,7 +26,6 @@ class ReActAgent:
         await self.mcp.call_tool("internal", "log_diary_step", {"role": "USER", "content": query})
         
         memory_context = await self.mcp.call_tool("internal", "get_memory_context", {"query": query})
-        await self.mcp.call_tool("internal", "add_user_memory", {"text": query})
         
         tools = await self.mcp.get_all_tools()
         tools_desc = "\nAvailable MCP Tools:\n"
@@ -57,7 +56,6 @@ class ReActAgent:
                 
                 if "Answer:" in content:
                     answer_text = content.split("Answer:", 1)[1].strip()
-                    await self.mcp.call_tool("internal", "add_agent_memory", {"text": answer_text})
                     await self.mcp.call_tool("internal", "log_diary_step", {"role": "AGENT_FINAL_ANSWER", "content": answer_text})
                     return answer_text
                     

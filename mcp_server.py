@@ -7,6 +7,7 @@ import os
 model_name = os.getenv("OPENAI_MODEL_NAME", "ollama/gemma4:e4b")
 api_base = os.getenv("OPENAI_BASE_URL", "http://localhost:11434/v1")
 api_key = os.getenv("OPENAI_API_KEY", "ollama")
+agent_learning_enabled = os.getenv("AGENT_LEARNING_ENABLED", "False").lower() == "true"
 memory = MemoryManager(model_name=model_name, api_base=api_base, api_key=api_key)
 diary = Diary()
 
@@ -15,17 +16,7 @@ def get_memory_context(query: str) -> str:
     """Get the semantic, relational, and entity context for a query."""
     return memory.query_memory(query)
 
-@mcp.tool()
-def add_user_memory(text: str) -> str:
-    """Add a raw observation to the memory engine."""
-    memory.add_memory(text, source="user_input")
-    return "Stored in memory."
 
-@mcp.tool()
-def add_agent_memory(text: str) -> str:
-    """Add the agent's finalized answer to memory."""
-    memory.add_memory(text, source="agent_thought_process")
-    return "Stored agent answer in memory."
 
 @mcp.tool()
 def log_diary_step(role: str, content: str) -> str:
@@ -46,12 +37,16 @@ def list_diaries() -> str:
 @mcp.tool()
 def delete_graph_node(entity: str) -> str:
     """Deletes an entity node from the knowledge graph."""
+    if not agent_learning_enabled:
+        return "System Error: Agent Learning Mode is currently DISABLED."
     deleted = memory.graph_store.delete_node(entity)
     return f"Deleted node '{entity}'? {deleted}"
 
 @mcp.tool()
 def upsert_entity(name: str, type: str, attributes: dict) -> str:
     """Create or update structured JSON profile for person/product/topic."""
+    if not agent_learning_enabled:
+        return "System Error: Agent Learning Mode is currently DISABLED."
     return memory.entity_store.upsert_entity(name, type, attributes)
 
 @mcp.tool()
@@ -64,17 +59,23 @@ def get_entity(name: str) -> str:
 @mcp.tool()
 def delete_entity(name: str) -> str:
     """Delete profile from entity DB."""
+    if not agent_learning_enabled:
+        return "System Error: Agent Learning Mode is currently DISABLED."
     return memory.entity_store.delete_entity(name)
 
 @mcp.tool()
 def memorize_fact(fact: str) -> str:
     """Actively inject a new fact directly into the Vector and Graph databases."""
+    if not agent_learning_enabled:
+        return "System Error: Agent Learning Mode is currently DISABLED."
     memory.add_memory(fact, source="agent_active_learning")
     return f"Successfully ingrained fact into subconscious memory."
 
 @mcp.tool()
 def add_graph_edge(subject: str, predicate: str, object_node: str) -> str:
     """Surgically explicitly map a conceptual relationship in the Graph Database without background extraction."""
+    if not agent_learning_enabled:
+        return "System Error: Agent Learning Mode is currently DISABLED."
     memory.graph_store.add_triplets([(subject, predicate, object_node)])
     return f"Created Graph edge: ({subject}) -[{predicate}]-> ({object_node})"
 
@@ -99,6 +100,8 @@ def read_note(filename: str) -> str:
 @mcp.tool()
 def write_note(filename: str, content: str) -> str:
     """Create or overwrite a self-learning notebook markdown file."""
+    if not agent_learning_enabled:
+        return "System Error: Agent Learning Mode is currently DISABLED."
     import os
     if not os.path.exists("notes"):
         os.makedirs("notes")
@@ -110,6 +113,8 @@ def write_note(filename: str, content: str) -> str:
 @mcp.tool()
 def append_note(filename: str, content: str) -> str:
     """Append text to an existing note."""
+    if not agent_learning_enabled:
+        return "System Error: Agent Learning Mode is currently DISABLED."
     import os
     if not os.path.exists("notes"):
         os.makedirs("notes")
