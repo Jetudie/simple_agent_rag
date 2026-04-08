@@ -62,6 +62,42 @@ class MemoryManager:
                     print(f"Ingested {len(chunks)} chunks from {filename} into Vector memory.")
                 except Exception as e:
                     print(f"Error reading {filename}: {e}")
+                    
+    def sync_agent_notes(self, notes_dir: str = "notes"):
+        """Chunk and ingest self-authored agent notes into the VectorStore."""
+        import os
+        if not os.path.exists(notes_dir):
+            return
+            
+        for filename in os.listdir(notes_dir):
+            if filename.endswith(".md"):
+                file_path = os.path.join(notes_dir, filename)
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    
+                    chunks = []
+                    paragraphs = content.split("\n\n")
+                    curr_chunk = ""
+                    for p in paragraphs:
+                        if p.startswith("#"):
+                            if curr_chunk:
+                                chunks.append(curr_chunk.strip())
+                            curr_chunk = p + "\n"
+                        else:
+                            curr_chunk += p + "\n\n"
+                            if len(curr_chunk) > 1000:
+                                chunks.append(curr_chunk.strip())
+                                curr_chunk = ""
+                    if curr_chunk:
+                        chunks.append(curr_chunk.strip())
+                        
+                    chunks = [c for c in chunks if c.strip()]
+                    metas = [{"source": f"agent_notes/{filename}"} for _ in chunks]
+                    self.vector_store.add_texts(chunks, metas)
+                    print(f"Ingested {len(chunks)} chunks from {filename} into Vector memory.")
+                except Exception as e:
+                    print(f"Error reading {filename}: {e}")
             
     def query_memory(self, query: str) -> str:
         """Search both memories and synthesize the results."""
