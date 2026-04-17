@@ -22,6 +22,29 @@ class ReActAgent:
                 
         self.chat_history: List[Dict[str, str]] = [{"role": "system", "content": self.system_prompt}]
         
+    async def _gc_context(self):
+        max_messages = 30
+        if len(self.chat_history) > max_messages:
+            keep_count = 12
+            archive_msgs = self.chat_history[1:-keep_count]
+            self.chat_history = [self.chat_history[0]] + self.chat_history[-keep_count:]
+            
+            archive_text = ""
+            for msg in archive_msgs:
+                archive_text += f"\n--- {msg['role'].upper()} ---\n{msg['content']}\n"
+                
+            os.makedirs("diary", exist_ok=True)
+            with open("diary/context_archive.md", "a", encoding="utf-8") as f:
+                f.write(archive_text)
+                
+            transparency_msg = f"Observation: [Garbage Collection] {len(archive_msgs)} older messages were removed from the context window to save tokens. They have been archived to 'diary/context_archive.md'."
+            self.chat_history.insert(1, {"role": "user", "content": transparency_msg})
+            print(f"\n[System] {transparency_msg}")
+            
+            try:
+                await self.mcp.call_tool("internal", "log_diary_step", {"role": "SYSTEM_GC", "content": transparency_msg})
+            except Exception:
+                pass
     async def process_user_query(self, query: str, max_iterations: int = 8) -> str:
         await self.mcp.call_tool("internal", "log_diary_step", {"role": "USER", "content": query})
         
@@ -36,6 +59,7 @@ class ReActAgent:
         self.chat_history.append({"role": "user", "content": prompt})
         
         for i in range(max_iterations):
+            await self._gc_context()
             try:
                 response = await self.client.chat.completions.create(
                     model=self.model_name,
