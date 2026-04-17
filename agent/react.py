@@ -37,9 +37,21 @@ class ReActAgent:
             with open("diary/context_archive.md", "a", encoding="utf-8") as f:
                 f.write(archive_text)
                 
-            transparency_msg = f"Observation: [Garbage Collection] {len(archive_msgs)} older messages were removed from the context window to save tokens. They have been archived to 'diary/context_archive.md'."
+            summary_prompt = f"Summarize the following sequence of an AI agent's past thought process and executed actions. Focus strictly on what decisions were made, what tools were successfully run, and the overall progression towards the current goal. Keep it dense and concise.\n\nContext block to summarize:\n{archive_text[:20000]}"
+            
+            try:
+                print("\n[System] Compressing and summarizing evicted context memories...")
+                response = await self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[{"role": "user", "content": summary_prompt}]
+                )
+                summary = response.choices[0].message.content
+                transparency_msg = f"Observation: [Garbage Collection Event] {len(archive_msgs)} older messages were removed from the context window to preserve token limits. However, to ensure you do not lose your train of thought, here is a compressed summary of the pruned context:\n\n{summary}\n\n(Full raw logs were physically archived to 'diary/context_archive.md')."
+            except Exception as e:
+                transparency_msg = f"Observation: [Garbage Collection] {len(archive_msgs)} older messages were removed. Summarization failed ({e}). They have been archived to 'diary/context_archive.md'."
+                
             self.chat_history.insert(1, {"role": "user", "content": transparency_msg})
-            print(f"\n[System] {transparency_msg}")
+            print(f"\n[System] GC Archiving Complete. Embedded summary into context.")
             
             try:
                 await self.mcp.call_tool("internal", "log_diary_step", {"role": "SYSTEM_GC", "content": transparency_msg})
