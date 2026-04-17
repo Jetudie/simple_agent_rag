@@ -140,7 +140,8 @@ def list_directory(path: str = ".") -> str:
     
     if not workspace_read_access:
         # Sandboxed mode: only let it see safe folders or the project root.
-        if path not in [".", "documents", "notes", "diary"]:
+        clean_path = os.path.normpath(path).replace('\\', '/').strip('/')
+        if not (clean_path in ["", "."] or clean_path.split('/')[0] in ["documents", "notes", "diary"]):
             return f"System Error: WORKSPACE_READ_ACCESS is disabled. You are sandboxed to reading only '.' or 'documents/', 'notes/', and 'diary/'."
             
     base_dir = os.path.abspath(path)
@@ -170,7 +171,8 @@ def read_source_file(path: str) -> str:
     import os
     
     if not workspace_read_access:
-        if not (path.startswith("documents/") or path.startswith("notes/") or path.startswith("diary/") or path in ["AGENT.md", "walkthrough.md"]):
+        clean_path = os.path.normpath(path).replace('\\', '/').strip('/')
+        if not (clean_path.split('/')[0] in ["documents", "notes", "diary"] or clean_path in ["AGENT.md", "walkthrough.md"]):
             return "System Error: WORKSPACE_READ_ACCESS is disabled. Sandboxed from reading deep source files."
 
     base_path = os.path.abspath(path)

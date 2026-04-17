@@ -41,24 +41,7 @@ class MemoryManager:
                     with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
                     
-                    # Custom lightweight chunking
-                    chunks = []
-                    paragraphs = content.split("\n\n")
-                    curr_chunk = ""
-                    for p in paragraphs:
-                        if p.startswith("#"):
-                            if curr_chunk:
-                                chunks.append(curr_chunk.strip())
-                            curr_chunk = p + "\n"
-                        else:
-                            curr_chunk += p + "\n\n"
-                            if len(curr_chunk) > 1000:
-                                chunks.append(curr_chunk.strip())
-                                curr_chunk = ""
-                    if curr_chunk:
-                        chunks.append(curr_chunk.strip())
-                        
-                    chunks = [c for c in chunks if c.strip()]
+                    chunks = self._chunk_content(content)
                     metas = [{"source": f"local_documents/{filename}"} for _ in chunks]
                     self.vector_store.add_texts(chunks, metas)
                     print(f"Ingested {len(chunks)} chunks from {filename} into Vector memory.")
@@ -78,23 +61,7 @@ class MemoryManager:
                     with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
                     
-                    chunks = []
-                    paragraphs = content.split("\n\n")
-                    curr_chunk = ""
-                    for p in paragraphs:
-                        if p.startswith("#"):
-                            if curr_chunk:
-                                chunks.append(curr_chunk.strip())
-                            curr_chunk = p + "\n"
-                        else:
-                            curr_chunk += p + "\n\n"
-                            if len(curr_chunk) > 1000:
-                                chunks.append(curr_chunk.strip())
-                                curr_chunk = ""
-                    if curr_chunk:
-                        chunks.append(curr_chunk.strip())
-                        
-                    chunks = [c for c in chunks if c.strip()]
+                    chunks = self._chunk_content(content)
                     metas = [{"source": f"agent_notes/{filename}"} for _ in chunks]
                     self.vector_store.add_texts(chunks, metas)
                     print(f"Ingested {len(chunks)} chunks from {filename} into Vector memory.")
@@ -178,3 +145,23 @@ class MemoryManager:
         except Exception as e:
             print(f"Failed to extract entities from query: {e}")
             return []
+
+    def _chunk_content(self, content: str) -> List[str]:
+        """Custom lightweight markdown chunking logic."""
+        chunks = []
+        paragraphs = content.split("\n\n")
+        curr_chunk = ""
+        for p in paragraphs:
+            if p.startswith("#"):
+                if curr_chunk:
+                    chunks.append(curr_chunk.strip())
+                curr_chunk = p + "\n"
+            else:
+                curr_chunk += p + "\n\n"
+                if len(curr_chunk) > 1000:
+                    chunks.append(curr_chunk.strip())
+                    curr_chunk = ""
+        if curr_chunk:
+            chunks.append(curr_chunk.strip())
+            
+        return [c for c in chunks if c.strip()]

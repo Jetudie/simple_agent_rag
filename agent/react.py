@@ -54,13 +54,18 @@ class ReActAgent:
                     print(f"[Harness Violation Detected]")
                     continue
                 
-                if "Answer:" in content:
+                has_action = "Action:" in content
+                has_answer = "Answer:" in content
+                
+                if has_answer and not has_action:
                     answer_text = content.split("Answer:", 1)[1].strip()
                     await self.mcp.call_tool("internal", "log_diary_step", {"role": "AGENT_FINAL_ANSWER", "content": answer_text})
                     return answer_text
                     
-                if "Action:" in content:
-                    json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
+                if has_action:
+                    json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
+                    if not json_match:
+                        json_match = re.search(r'(\{.*"server".*:.*"tool".*:.*\})', content, re.DOTALL)
                     if json_match:
                         action_dict = json.loads(json_match.group(1))
                         server = action_dict.get("server")
