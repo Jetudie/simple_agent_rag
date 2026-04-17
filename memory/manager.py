@@ -6,7 +6,7 @@ from memory.entity_store import EntityStore
 from openai import OpenAI
 
 class MemoryManager:
-    def __init__(self, model_name: str = "ollama/gemma4:e4b", api_base: str = "http://localhost:11434", api_key: str = ""):
+    def __init__(self, model_name: str = "gemma4:e2b", api_base: str = "http://localhost:11434", api_key: str = ""):
         """Initialize both memory stores."""
         self.vector_store = VectorStore()
         self.graph_store = GraphStore()

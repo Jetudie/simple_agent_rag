@@ -6,7 +6,7 @@ from openai import AsyncOpenAI
 from tools.mcp_client import MCPClientManager
 
 class ReActAgent:
-    def __init__(self, mcp_client: MCPClientManager, model_name: str = "ollama/gemma4:e4b", api_base: str = "http://localhost:11434", api_key: str = ""):
+    def __init__(self, mcp_client: MCPClientManager, model_name: str = "gemma4:e2b", api_base: str = "http://localhost:11434", api_key: str = ""):
         self.mcp = mcp_client
         self.model_name = model_name
         self.api_base = api_base
