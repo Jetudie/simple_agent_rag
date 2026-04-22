@@ -11,7 +11,7 @@ agent_learning_enabled = os.getenv("AGENT_LEARNING_ENABLED", "False").lower() ==
 workspace_read_access = os.getenv("WORKSPACE_READ_ACCESS", "False").lower() == "true"
 
 allow_terminal_execution = os.getenv("ALLOW_TERMINAL_EXECUTION", "False").lower() == "true"
-raw_write_dirs = os.getenv("WORKSPACE_ALLOWED_WRITE_DIRS", "sandbox,notes,documents")
+raw_write_dirs = os.getenv("WORKSPACE_ALLOWED_WRITE_DIRS", "sandbox,notes,documents,debug")
 workspace_allowed_write_dirs = [d.strip() for d in raw_write_dirs.split(",") if d.strip()]
 virtual_cwd = os.getcwd()
 
@@ -20,6 +20,7 @@ diary = Diary()
 
 # Create sandbox directory if it doesn't exist
 os.makedirs("sandbox", exist_ok=True)
+os.makedirs("debug", exist_ok=True)
 
 @mcp.tool()
 def get_memory_context(query: str) -> str:
@@ -141,8 +142,8 @@ def list_directory(path: str = ".") -> str:
     if not workspace_read_access:
         # Sandboxed mode: only let it see safe folders or the project root.
         clean_path = os.path.normpath(path).replace('\\', '/').strip('/')
-        if not (clean_path in ["", "."] or clean_path.split('/')[0] in ["documents", "notes", "diary"]):
-            return f"System Error: WORKSPACE_READ_ACCESS is disabled. You are sandboxed to reading only '.' or 'documents/', 'notes/', and 'diary/'."
+        if not (clean_path in ["", "."] or clean_path.split('/')[0] in ["documents", "notes", "diary", "debug"]):
+            return f"System Error: WORKSPACE_READ_ACCESS is disabled. You are sandboxed to reading only '.' or 'documents/', 'notes/', 'diary/', and 'debug/'."
             
     base_dir = os.path.abspath(path)
     # Simple check to prevent escaping the project root
@@ -172,7 +173,7 @@ def read_source_file(path: str) -> str:
     
     if not workspace_read_access:
         clean_path = os.path.normpath(path).replace('\\', '/').strip('/')
-        if not (clean_path.split('/')[0] in ["documents", "notes", "diary"] or clean_path in ["AGENT.md", "walkthrough.md"]):
+        if not (clean_path.split('/')[0] in ["documents", "notes", "diary", "debug", "sandbox"] or clean_path in ["AGENT.md", "walkthrough.md"]):
             return "System Error: WORKSPACE_READ_ACCESS is disabled. Sandboxed from reading deep source files."
 
     base_path = os.path.abspath(path)
@@ -255,7 +256,7 @@ def grep_codebase(regex_pattern: str, dir: str = ".") -> str:
     import os
     import re
     if not workspace_read_access:
-        if dir not in [".", "documents", "notes", "diary", "sandbox"]:
+        if dir not in [".", "documents", "notes", "diary", "sandbox", "debug"]:
             return "System Error: WORKSPACE_READ_ACCESS is disabled."
             
     base_dir = os.path.abspath(dir)
@@ -323,6 +324,82 @@ def run_command(command: str) -> str:
         return "System Error: Command timed out after 30 seconds."
     except Exception as e:
         return f"System Error executing command: {str(e)}"
+
+@mcp.tool()
+def query_csv_sql(filepath: str, sql_query: str) -> str:
+    """Load a CSV into an in-memory SQLite database (table: 'csv_data') and run a SQL query. Hex strings (0xA) and decimals are auto-converted to integers."""
+    import os
+    import csv
+    import sqlite3
+    import json
+
+    if not workspace_read_access:
+        clean_path = os.path.normpath(filepath).replace('\\', '/').strip('/')
+        if not (clean_path.split('/')[0] in ["documents", "notes", "diary", "debug", "sandbox"]):
+            return "System Error: WORKSPACE_READ_ACCESS is disabled. Sandboxed from reading deep source files."
+
+    base_path = os.path.abspath(filepath)
+    if not base_path.startswith(os.getcwd()):
+        return "System Error: Path traversal attempt blocked."
+        
+    if not os.path.isfile(base_path):
+        return f"File {filepath} not found."
+        
+    try:
+        with open(base_path, mode='r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            headers = next(reader, None)
+            if not headers:
+                return "Error: CSV is empty."
+                
+            # Clean headers to be safe for sqlite
+            clean_headers = [h.strip().replace(" ", "_").replace("-", "_") for h in headers]
+            
+            conn = sqlite3.connect(':memory:')
+            cursor = conn.cursor()
+            
+            # Create table
+            cols_def = ", ".join([f'"{h}" TEXT' for h in clean_headers])
+            cursor.execute(f"CREATE TABLE csv_data ({cols_def})")
+            
+            # Insert data, parsing hex and dec
+            def parse_val(val):
+                val_str = val.strip()
+                if val_str.lower().startswith('0x'):
+                    try:
+                        return int(val_str, 16)
+                    except ValueError:
+                        return val
+                try:
+                    if '.' in val_str:
+                        return float(val_str)
+                    return int(val_str)
+                except ValueError:
+                    return val
+                    
+            insert_sql = f"INSERT INTO csv_data VALUES ({','.join(['?'] * len(clean_headers))})"
+            
+            for row in reader:
+                # pad or truncate row to match headers
+                row = row[:len(clean_headers)] + [''] * max(0, len(clean_headers) - len(row))
+                parsed_row = [parse_val(c) for c in row]
+                cursor.execute(insert_sql, parsed_row)
+                
+            conn.commit()
+            
+            # Execute AI's query
+            cursor.execute(sql_query)
+            columns = [description[0] for description in cursor.description] if cursor.description else []
+            rows = cursor.fetchall()
+            
+            if not columns:
+                 return "Query executed successfully, but returned no rows (e.g. UPDATE/DELETE)."
+                 
+            results = [dict(zip(columns, row)) for row in rows]
+            return json.dumps(results, indent=2)
+            
+    except Exception as e:
+        return f"Error executing SQL on CSV: {str(e)}"
 
 # Trigger the document sync so trusted vectors are loaded before any query arrives
 memory.sync_local_documents()
