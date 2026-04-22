@@ -5,19 +5,20 @@ I have successfully designed and built the requested AI Agent.
 ## Architecture Highlights
 The core logic resides in a set of meticulously decoupled components:
 
-1. **Dual RAG Memory Manager**: 
-    - `memory/vector_store.py`: Uses local `Qdrant` with local `fastembed` embeddings (BAAI model).
-    - `memory/graph_store.py`: Uses `networkx` to capture `(subject, predicate, object)` knowledge snippets.
-    - Built into unified logic inside `memory/manager.py` which intercepts user text contextually and executes dual searches.
+1. **Tri-Layer Memory System**: 
+    - **Vector RAG**: `memory/vector_store.py` Uses local embeddings for semantic density.
+    - **Graph RAG**: `memory/graph_store.py` natively maps Relational Triplets.
+    - **Entity Store**: Structured JSON objects for categorizing people/topics.
 2. **Robust Tooling Execution (MCP)**:
-    - `tools/mcp_client.py`: An asynchronous implementation mimicking standard Model Context Protocol handling of Stdio servers.
-3. **Rigid ReAct System**: 
-    - `agent/react.py`: Instructs the agent with rigorous rules (OpenEvidence-style), enforcing strict `Thought`/`Action`/`Observation`/`Answer` sequences.
-4. **Shell Interface**:
-    - `main.py` provides a beautifully formatted console to interact with the agent natively.
-
-## Testing & Validation
-All source code files compile without fatal errors (`exit code 0` passing). Environment initialization successfully wraps inside a standard `venv` environment.
+    - The reasoning logic in `react.py` is safely decoupled, communicating via `mcp_client.py` to `mcp_server.py`.
+3. **Agentic File Routing (OpenClaw)**:
+    - Empowered by `list_directory` and `read_source_file`, the AI navigates the directory natively.
+4. **Read-Only Safeties & Discretionary Learning**:
+    - The Agent strictly chooses its memory using `memorize_fact`, protected by `AGENT_LEARNING_ENABLED`.
+5. **Software Engineering Tools (SWE)**:
+    - **Code Editing:** Tools like `patch_file` and `write_new_file` allow structural edits sandboxed within `WORKSPACE_ALLOWED_WRITE_DIRS` (default `sandbox,notes,documents`).
+    - **Grep Search:** The agent uses `grep_codebase` to execute regex patterns hunting down code variables natively.
+    - **Stateful Terminal:** Using `run_command`, the Agent can execute test routines with active retention of current working directory (`cd` intercepts).
 
 ## Usage
 

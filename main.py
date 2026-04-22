@@ -31,7 +31,7 @@ async def main():
     #     console.print(f"[yellow]Could not connect to filesystem MCP: {e}[/yellow]")
     
     import os
-    model_name = os.getenv("OPENAI_MODEL_NAME", "ollama/gemma4:e4b")
+    model_name = os.getenv("OPENAI_MODEL_NAME", "gemma4:e2b")
     api_base = os.getenv("OPENAI_BASE_URL", "http://localhost:11434/v1")
     api_key = os.getenv("OPENAI_API_KEY", "ollama")
     agent = ReActAgent(mcp_client, model_name=model_name, api_base=api_base, api_key=api_key)

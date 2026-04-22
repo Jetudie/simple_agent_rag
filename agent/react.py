@@ -6,7 +6,7 @@ from openai import AsyncOpenAI
 from tools.mcp_client import MCPClientManager
 
 class ReActAgent:
-    def __init__(self, mcp_client: MCPClientManager, model_name: str = "ollama/gemma4:e4b", api_base: str = "http://localhost:11434", api_key: str = ""):
+    def __init__(self, mcp_client: MCPClientManager, model_name: str = "gemma4:e2b", api_base: str = "http://localhost:11434", api_key: str = ""):
         self.mcp = mcp_client
         self.model_name = model_name
         self.api_base = api_base
@@ -22,6 +22,41 @@ class ReActAgent:
                 
         self.chat_history: List[Dict[str, str]] = [{"role": "system", "content": self.system_prompt}]
         
+    async def _gc_context(self):
+        max_messages = 30
+        if len(self.chat_history) > max_messages:
+            keep_count = 12
+            archive_msgs = self.chat_history[1:-keep_count]
+            self.chat_history = [self.chat_history[0]] + self.chat_history[-keep_count:]
+            
+            archive_text = ""
+            for msg in archive_msgs:
+                archive_text += f"\n--- {msg['role'].upper()} ---\n{msg['content']}\n"
+                
+            os.makedirs("diary", exist_ok=True)
+            with open("diary/context_archive.md", "a", encoding="utf-8") as f:
+                f.write(archive_text)
+                
+            summary_prompt = f"Summarize the following sequence of an AI agent's past thought process and executed actions. Focus strictly on what decisions were made, what tools were successfully run, and the overall progression towards the current goal. Keep it dense and concise.\n\nContext block to summarize:\n{archive_text[:20000]}"
+            
+            try:
+                print("\n[System] Compressing and summarizing evicted context memories...")
+                response = await self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[{"role": "user", "content": summary_prompt}]
+                )
+                summary = response.choices[0].message.content
+                transparency_msg = f"Observation: [Garbage Collection Event] {len(archive_msgs)} older messages were removed from the context window to preserve token limits. However, to ensure you do not lose your train of thought, here is a compressed summary of the pruned context:\n\n{summary}\n\n(Full raw logs were physically archived to 'diary/context_archive.md')."
+            except Exception as e:
+                transparency_msg = f"Observation: [Garbage Collection] {len(archive_msgs)} older messages were removed. Summarization failed ({e}). They have been archived to 'diary/context_archive.md'."
+                
+            self.chat_history.insert(1, {"role": "user", "content": transparency_msg})
+            print(f"\n[System] GC Archiving Complete. Embedded summary into context.")
+            
+            try:
+                await self.mcp.call_tool("internal", "log_diary_step", {"role": "SYSTEM_GC", "content": transparency_msg})
+            except Exception:
+                pass
     async def process_user_query(self, query: str, max_iterations: int = 8) -> str:
         await self.mcp.call_tool("internal", "log_diary_step", {"role": "USER", "content": query})
         
@@ -36,6 +71,7 @@ class ReActAgent:
         self.chat_history.append({"role": "user", "content": prompt})
         
         for i in range(max_iterations):
+            await self._gc_context()
             try:
                 response = await self.client.chat.completions.create(
                     model=self.model_name,
@@ -54,13 +90,18 @@ class ReActAgent:
                     print(f"[Harness Violation Detected]")
                     continue
                 
-                if "Answer:" in content:
+                has_action = "Action:" in content
+                has_answer = "Answer:" in content
+                
+                if has_answer and not has_action:
                     answer_text = content.split("Answer:", 1)[1].strip()
                     await self.mcp.call_tool("internal", "log_diary_step", {"role": "AGENT_FINAL_ANSWER", "content": answer_text})
                     return answer_text
                     
-                if "Action:" in content:
-                    json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
+                if has_action:
+                    json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
+                    if not json_match:
+                        json_match = re.search(r'(\{.*"server".*:.*"tool".*:.*\})', content, re.DOTALL)
                     if json_match:
                         action_dict = json.loads(json_match.group(1))
                         server = action_dict.get("server")
