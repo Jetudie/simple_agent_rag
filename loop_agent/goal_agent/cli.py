@@ -6,6 +6,7 @@ import argparse
 import sys
 
 from .config import ConfigError, load_config
+from .opencode_client import OpenCodeClient
 from .runner import AgentRunError, GoalAgent
 
 
@@ -42,7 +43,17 @@ def main(argv: list[str] | None = None) -> int:
                 if not path.is_file() or not path.read_text(encoding="utf-8").strip():
                     raise ConfigError(f"Required {label} file is missing or empty: {path}")
             print(f"Configuration is valid. Workspace: {config.workspace.root}")
-            print(f"Model: {config.api.model}; API: {config.api.base_url}")
+            if config.backend == "opencode":
+                opencode = OpenCodeClient(config.opencode, config.workspace.root)
+                model = config.opencode.model or "OpenCode default"
+                print(
+                    f"Backend: OpenCode; executable: {opencode.executable}; "
+                    f"server: {config.opencode.server_url or 'standalone'}; model: {model}"
+                )
+            else:
+                if config.api is None:
+                    raise ConfigError("API backend selected without an [api] configuration")
+                print(f"Backend: API; model: {config.api.model}; API: {config.api.base_url}")
             print(
                 f"Limits: {config.run.max_loops} loops, {config.run.max_time_seconds:g}s total, "
                 f"{config.run.delay_seconds:g}s delay"

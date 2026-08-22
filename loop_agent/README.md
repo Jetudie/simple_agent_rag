@@ -1,8 +1,8 @@
 # Persistent Goal Agent
 
 A small Python agent that keeps working toward file-defined targets until an independent verifier accepts
-every pass criterion, or the configured loop/time limit is reached. It talks to any API implementing the
-OpenAI Chat Completions tool-calling format and has no third-party Python dependencies.
+every pass criterion, or the configured loop/time limit is reached. It can use either an OpenAI-compatible
+Chat Completions API or the OpenCode CLI and has no third-party Python dependencies.
 
 ## How the shift loop works
 
@@ -37,8 +37,11 @@ python -m pip install -r requirements.txt
 1. Edit `AGENTS.md` with global instructions.
 2. Put the desired outcomes in `GOALS.md`.
 3. Put objective acceptance checks in `PASS_CRITERIA.md`.
-4. Edit `config.toml` for the compatible API, model, loop count, delay, maximum total time, and tool limits.
-5. Set the API key. The supplied config reads it from `OPENAI_API_KEY`:
+4. Edit `config.toml` for the backend, model, loop count, delay, maximum total time, and tool limits.
+
+### OpenAI-compatible API backend
+
+Keep `backend.type = "api"` and set the API key. The supplied config reads it from `OPENAI_API_KEY`:
 
    ```powershell
    $env:OPENAI_API_KEY = "sk-your-key"
@@ -54,6 +57,43 @@ python -m pip install -r requirements.txt
 `/chat/completions`. `${NAME}` and `$NAME` environment references are supported in API string settings and
 custom headers. To use a local provider without a meaningful key, configure whatever non-empty placeholder
 that provider accepts directly in `config.toml`.
+
+### OpenCode backend
+
+Start OpenCode separately:
+
+```bash
+opencode serve --port 4096
+```
+
+Then select it in `config.toml`:
+
+```toml
+[backend]
+type = "opencode"
+
+[opencode]
+executable = "opencode"
+server_url = "http://localhost:4096"
+# model = "provider/model"   # Omit to use the OpenCode default.
+# agent = "build"            # Omit to use the OpenCode default.
+# verifier_agent = "plan"    # Optional separate verifier agent.
+timeout_seconds = 600
+auto_approve = false
+extra_args = []
+```
+
+No OpenAI-compatible URL or API key is required in this mode. Every phase uses a new `opencode run` command
+with `--attach`, `--dir`, and any configured model or agent. The orchestrator never passes `--continue` or
+`--session`, so achievement and verification remain separate OpenCode sessions. Authentication for the
+models used by OpenCode remains OpenCode's responsibility.
+
+The subprocess receives arguments as a list with `shell=False`; `shell=True` is unnecessary and would make
+prompt contents vulnerable to shell interpretation.
+
+`auto_approve = false` is the safer default. Configure OpenCode agent permissions appropriately or enable it
+if unattended work would otherwise be denied. `extra_args` can hold additional documented `opencode run`
+flags such as `["--variant", "high"]`.
 
 ## Run
 
@@ -84,7 +124,7 @@ handover. Configuration, API, and fatal orchestration errors exit with code 2.
 | File | Purpose |
 |---|---|
 | `AGENTS.md` | User-controlled global prompt, analogous to Codex CLI project guidance. |
-| `config.toml` | API URL/key/model, loop/time controls, paths, and tool limits. |
+| `config.toml` | Backend, API/OpenCode settings, loop/time controls, paths, and tool limits. |
 | `GOALS.md` | Authoritative target list. |
 | `PASS_CRITERIA.md` | Authoritative independent acceptance checks. |
 | `HANDOVER.md` | Detailed durable shift notes: done, TODOs, tests, risks, verdict, and evidence. |
@@ -107,6 +147,9 @@ remain a trust boundary.
 
 Set `allow_commands = false` to disable command execution. File and command output is size-limited before it
 is returned to the model.
+
+These built-in tool restrictions apply to the API backend. In OpenCode mode, OpenCode supplies its own tools
+and permission system; configure the selected OpenCode agents accordingly, especially the verifier agent.
 
 ## Tests
 

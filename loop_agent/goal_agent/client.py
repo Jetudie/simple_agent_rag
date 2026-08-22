@@ -38,7 +38,9 @@ class OpenAICompatibleClient:
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
         timeout_seconds: float | None = None,
+        phase: str = "achievement",
     ) -> ChatResponse:
+        del phase  # The HTTP backend uses the same transport for both isolated phases.
         payload: dict[str, Any] = {
             "model": self.config.model,
             "messages": messages,

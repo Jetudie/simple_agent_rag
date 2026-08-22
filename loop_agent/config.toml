@@ -1,4 +1,8 @@
-# OpenAI-compatible Chat Completions API settings.
+# Select "api" or "opencode". OpenCode mode does not require the [api] key.
+[backend]
+type = "api"
+
+# OpenAI-compatible Chat Completions API settings (used when backend.type = "api").
 # You may put a key directly here, but an environment variable avoids storing a secret in this file.
 # PowerShell example: $env:OPENAI_API_KEY = "sk-..."
 [api]
@@ -9,6 +13,18 @@ timeout_seconds = 120
 max_retries = 3
 # temperature = 0.2
 # extra_headers = { "X-Custom-Header" = "value" }
+
+# OpenCode CLI settings (used when backend.type = "opencode").
+# Start the server separately, for example: opencode serve --port 4096
+[opencode]
+executable = "opencode"
+server_url = "http://localhost:4096"
+# model = "provider/model"
+# agent = "build"
+# verifier_agent = "plan"
+timeout_seconds = 600
+auto_approve = false
+extra_args = []
 
 # One loop is one fresh achievement shift followed by one fresh independent verification shift.
 [run]
@@ -33,4 +49,3 @@ max_output_chars = 30000
 max_file_bytes = 1000000
 # Commands are passed as argument arrays with shell=False. Add only executables you trust.
 allowed_commands = ["python", "python3", "py", "pytest", "git", "node", "npm", "npx"]
-

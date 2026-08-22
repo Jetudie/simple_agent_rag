@@ -46,6 +46,18 @@ class ApiConfig:
 
 
 @dataclass(frozen=True)
+class OpenCodeConfig:
+    executable: str = "opencode"
+    server_url: str = "http://localhost:4096"
+    model: str = ""
+    agent: str = ""
+    verifier_agent: str = ""
+    timeout_seconds: float = 600.0
+    auto_approve: bool = False
+    extra_args: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class RunConfig:
     max_loops: int = 8
     delay_seconds: float = 5.0
@@ -93,10 +105,12 @@ class ToolConfig:
 @dataclass(frozen=True)
 class AgentConfig:
     source: Path
-    api: ApiConfig
+    api: ApiConfig | None
     run: RunConfig
     workspace: WorkspaceConfig
     tools: ToolConfig
+    backend: str = "api"
+    opencode: OpenCodeConfig = field(default_factory=OpenCodeConfig)
 
 
 def load_config(path: str | Path) -> AgentConfig:
@@ -110,27 +124,16 @@ def load_config(path: str | Path) -> AgentConfig:
     except tomllib.TOMLDecodeError as exc:
         raise ConfigError(f"Invalid TOML in {source}: {exc}") from exc
 
+    backend_data = _table(data, "backend")
     api_data = _table(data, "api")
+    opencode_data = _table(data, "opencode")
     run_data = _table(data, "run")
     workspace_data = _table(data, "workspace")
     tools_data = _table(data, "tools")
 
-    try:
-        base_url = _expand_env(str(api_data["base_url"])).strip().rstrip("/")
-        api_key = _expand_env(str(api_data["api_key"])).strip()
-        model = _expand_env(str(api_data["model"])).strip()
-    except KeyError as exc:
-        raise ConfigError(f"Missing required [api] setting: {exc.args[0]}") from exc
-
-    if not base_url or not api_key or not model:
-        raise ConfigError("[api] base_url, api_key, and model must not be empty")
-    if api_key in {"YOUR_API_KEY", "replace-me", "changeme"}:
-        raise ConfigError("Replace the placeholder [api].api_key before running the agent")
-
-    extra_headers_raw = api_data.get("extra_headers", {})
-    if not isinstance(extra_headers_raw, dict):
-        raise ConfigError("[api].extra_headers must be a TOML inline table")
-    extra_headers = {str(key): _expand_env(str(value)) for key, value in extra_headers_raw.items()}
+    backend = str(backend_data.get("type", "api")).strip().lower()
+    if backend not in {"api", "opencode"}:
+        raise ConfigError("[backend].type must be either 'api' or 'opencode'")
 
     root_value = _expand_env(str(workspace_data.get("root", ".")))
     root = Path(root_value).expanduser()
@@ -140,16 +143,77 @@ def load_config(path: str | Path) -> AgentConfig:
     if not root.is_dir():
         raise ConfigError(f"Workspace root does not exist or is not a directory: {root}")
 
-    api = ApiConfig(
-        base_url=base_url,
-        api_key=api_key,
-        model=model,
-        timeout_seconds=float(api_data.get("timeout_seconds", 120)),
-        max_retries=int(api_data.get("max_retries", 3)),
-        temperature=(
-            None if api_data.get("temperature") is None else float(api_data["temperature"])
-        ),
-        extra_headers=extra_headers,
+    api: ApiConfig | None = None
+    if backend == "api":
+        try:
+            base_url = _expand_env(str(api_data["base_url"])).strip().rstrip("/")
+            api_key = _expand_env(str(api_data["api_key"])).strip()
+            model = _expand_env(str(api_data["model"])).strip()
+        except KeyError as exc:
+            raise ConfigError(f"Missing required [api] setting: {exc.args[0]}") from exc
+
+        if not base_url or not api_key or not model:
+            raise ConfigError("[api] base_url, api_key, and model must not be empty")
+        if api_key in {"YOUR_API_KEY", "replace-me", "changeme"}:
+            raise ConfigError("Replace the placeholder [api].api_key before running the agent")
+
+        extra_headers_raw = api_data.get("extra_headers", {})
+        if not isinstance(extra_headers_raw, dict):
+            raise ConfigError("[api].extra_headers must be a TOML inline table")
+        extra_headers = {
+            str(key): _expand_env(str(value)) for key, value in extra_headers_raw.items()
+        }
+        api = ApiConfig(
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            timeout_seconds=float(api_data.get("timeout_seconds", 120)),
+            max_retries=int(api_data.get("max_retries", 3)),
+            temperature=(
+                None if api_data.get("temperature") is None else float(api_data["temperature"])
+            ),
+            extra_headers=extra_headers,
+        )
+
+    extra_args_raw = opencode_data.get("extra_args", [])
+    if not isinstance(extra_args_raw, list) or not all(
+        isinstance(item, str) for item in extra_args_raw
+    ):
+        raise ConfigError("[opencode].extra_args must be an array of strings")
+    reserved_opencode_flags = {
+        "--attach",
+        "--command",
+        "--continue",
+        "-c",
+        "--dir",
+        "--fork",
+        "--format",
+        "--session",
+        "-s",
+    }
+    used_reserved_flags = sorted(
+        {
+            item.split("=", 1)[0]
+            for item in extra_args_raw
+            if item.split("=", 1)[0] in reserved_opencode_flags
+        }
+    )
+    if used_reserved_flags:
+        raise ConfigError(
+            "[opencode].extra_args contains orchestrator-reserved flag(s): "
+            + ", ".join(used_reserved_flags)
+        )
+    opencode = OpenCodeConfig(
+        executable=_expand_env(str(opencode_data.get("executable", "opencode"))).strip(),
+        server_url=_expand_env(
+            str(opencode_data.get("server_url", "http://localhost:4096"))
+        ).strip(),
+        model=_expand_env(str(opencode_data.get("model", ""))).strip(),
+        agent=_expand_env(str(opencode_data.get("agent", ""))).strip(),
+        verifier_agent=_expand_env(str(opencode_data.get("verifier_agent", ""))).strip(),
+        timeout_seconds=float(opencode_data.get("timeout_seconds", 600)),
+        auto_approve=bool(opencode_data.get("auto_approve", False)),
+        extra_args=tuple(extra_args_raw),
     )
     run = RunConfig(
         max_loops=int(run_data.get("max_loops", 8)),
@@ -177,8 +241,12 @@ def load_config(path: str | Path) -> AgentConfig:
         allowed_commands=tuple(item.lower() for item in allowed_raw),
     )
 
-    if api.timeout_seconds <= 0 or api.max_retries < 0:
+    if api is not None and (api.timeout_seconds <= 0 or api.max_retries < 0):
         raise ConfigError("API timeout must be positive and max_retries cannot be negative")
+    if not opencode.executable:
+        raise ConfigError("[opencode].executable must not be empty")
+    if opencode.timeout_seconds <= 0:
+        raise ConfigError("[opencode].timeout_seconds must be positive")
     if run.max_loops <= 0 or run.max_turns_per_phase <= 0:
         raise ConfigError("max_loops and max_turns_per_phase must be positive")
     if run.delay_seconds < 0 or run.max_time_seconds <= 0:
@@ -196,5 +264,12 @@ def load_config(path: str | Path) -> AgentConfig:
     ):
         workspace.path_for(configured_path)
 
-    return AgentConfig(source=source, api=api, run=run, workspace=workspace, tools=tools)
-
+    return AgentConfig(
+        source=source,
+        api=api,
+        run=run,
+        workspace=workspace,
+        tools=tools,
+        backend=backend,
+        opencode=opencode,
+    )

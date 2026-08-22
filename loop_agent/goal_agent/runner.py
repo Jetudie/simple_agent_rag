@@ -12,6 +12,7 @@ from typing import Any, Callable
 from .client import ApiError, OpenAICompatibleClient
 from .config import AgentConfig, ConfigError
 from .journal import RunJournal
+from .opencode_client import OpenCodeClient
 from .prompts import ACHIEVER_SYSTEM, VERIFIER_SYSTEM, achiever_prompt, verifier_prompt
 from .tools import ToolError, WorkspaceTools, tool_result_json
 
@@ -189,7 +190,14 @@ class GoalAgent:
         output: Callable[[str], None] = print,
     ) -> None:
         self.config = config
-        self.client = client or OpenAICompatibleClient(config.api)
+        if client is not None:
+            self.client = client
+        elif config.backend == "opencode":
+            self.client = OpenCodeClient(config.opencode, config.workspace.root)
+        else:
+            if config.api is None:
+                raise ConfigError("API backend selected without an [api] configuration")
+            self.client = OpenAICompatibleClient(config.api)
         self.clock = clock
         self.sleeper = sleeper
         self.output = output
@@ -213,6 +221,7 @@ class GoalAgent:
         user_prompt: str,
         tools: WorkspaceTools,
         deadline: float,
+        phase: str,
     ) -> tuple[str, list[dict[str, Any]]]:
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
@@ -222,10 +231,16 @@ class GoalAgent:
             remaining = deadline - self.clock()
             if remaining <= 0:
                 raise TimeoutError("Run time limit reached during model phase")
+            backend_timeout = (
+                self.config.opencode.timeout_seconds
+                if self.config.backend == "opencode"
+                else self.config.api.timeout_seconds if self.config.api is not None else remaining
+            )
             response = self.client.chat(
                 messages,
                 tools.definitions,
-                timeout_seconds=min(self.config.api.timeout_seconds, max(0.1, remaining)),
+                timeout_seconds=min(backend_timeout, max(0.1, remaining)),
+                phase=phase,
             )
             message = response.message
             assistant_message: dict[str, Any] = {
@@ -326,6 +341,7 @@ class GoalAgent:
                     achiever_prompt(goals, criteria, handover, feedback, cycle),
                     self._workspace_tools(read_only=False),
                     deadline,
+                    "achievement",
                 )
                 try:
                     latest_achievement = normalize_achievement(extract_json_object(achievement_text))
@@ -364,6 +380,7 @@ class GoalAgent:
                     ),
                     self._workspace_tools(read_only=True),
                     deadline,
+                    "verification",
                 )
                 try:
                     latest_verification = normalize_verification(
