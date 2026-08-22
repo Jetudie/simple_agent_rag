@@ -1,0 +1,5 @@
+# This project has no third-party runtime dependencies.
+#
+# Python 3.11 or newer is required. The agent uses only the standard library
+# (including tomllib, urllib, pathlib, subprocess, and unittest).
+

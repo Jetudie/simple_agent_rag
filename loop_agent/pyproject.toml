@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "persistent-goal-agent"
+version = "0.1.0"
+description = "A persistent goal-achieving agent with independent verification shifts."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+goal-agent = "goal_agent.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["goal_agent*"]
+

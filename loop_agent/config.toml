@@ -1,0 +1,36 @@
+# OpenAI-compatible Chat Completions API settings.
+# You may put a key directly here, but an environment variable avoids storing a secret in this file.
+# PowerShell example: $env:OPENAI_API_KEY = "sk-..."
+[api]
+base_url = "https://api.openai.com/v1"
+api_key = "${OPENAI_API_KEY}"
+model = "gpt-5"
+timeout_seconds = 120
+max_retries = 3
+# temperature = 0.2
+# extra_headers = { "X-Custom-Header" = "value" }
+
+# One loop is one fresh achievement shift followed by one fresh independent verification shift.
+[run]
+max_loops = 8
+delay_seconds = 5
+max_time_seconds = 3600
+max_turns_per_phase = 30
+
+[workspace]
+root = "."
+agents_file = "AGENTS.md"
+goals_file = "GOALS.md"
+criteria_file = "PASS_CRITERIA.md"
+handover_file = "HANDOVER.md"
+feedback_file = "VERIFICATION_FEEDBACK.md"
+state_dir = ".goal_agent"
+
+[tools]
+allow_commands = true
+command_timeout_seconds = 120
+max_output_chars = 30000
+max_file_bytes = 1000000
+# Commands are passed as argument arrays with shell=False. Add only executables you trust.
+allowed_commands = ["python", "python3", "py", "pytest", "git", "node", "npm", "npx"]
+
